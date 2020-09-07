@@ -1,0 +1,11 @@
+let engine = new PixelPerfect.Engine();
+let mainScene = new PixelPerfect.Scene(engine);
+let cam = new PixelPerfect.Camera(engine);
+let pos = new PixelPerfect.Place(10, 10, 10);
+let box = new PixelPerfect.Box(pos, [3, 3, 3]);
+let floor = new PixelPerfect.Plane(20);
+let camFace = PixelPerfect.Direction.point(cam.position, [10, 10, 10]);
+cam.face(camFace);
+mainScene.add(box, floor);
+cam.setScene(mainEngine);
+engine.setCam(cam).create().autoDraw(true).redraw();
