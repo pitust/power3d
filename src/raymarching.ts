@@ -93,7 +93,7 @@ ${binds.map(e => '    uniform highp vec3 ' + e + ';').join('\n')}
     }
     
     highp float plane(vec3 pos) {
-        return box(pos, vec3(1.0/0.0, 0.0, 1.0/0.0));
+        return box(pos, vec3(1.0/0.0, EPSILON, 1.0/0.0));
     }
 
     highp float distfunc(vec3 pos) {
@@ -103,15 +103,15 @@ ${binds.map(e => '    uniform highp vec3 ' + e + ';').join('\n')}
     highp vec3 albedo_for(vec3 pos) {
         ${albedoFunc}
     }
-    highp vec4 diffuse(highp vec3 pos, highp vec3 rayDir) {
-        highp vec2 eps = vec2(0.0, EPSILON);
+    highp vec4 diffuse(highp vec3 pos, highp vec3 rayDir, highp float dist) {
+        highp vec2 eps = vec2(0.0, 0.1);
         highp vec3 normal = normalize(vec3(
             distfunc(pos + eps.yxx) - distfunc(pos - eps.yxx),
             distfunc(pos + eps.xyx) - distfunc(pos - eps.xyx),
             distfunc(pos + eps.xxy) - distfunc(pos - eps.xxy)));
         highp float diffuse = max(0.0, dot(-rayDir, normal));
         highp float specular = 0.0; //  pow(diffuse, 100.0);
-        highp vec3 color = vec3(diffuse + specular) * albedo_for(pos);
+        highp vec3 color = vec3(diffuse) * albedo_for(pos);
         return vec4(color, 1.0);
     }
     void main() {
@@ -133,19 +133,14 @@ ${binds.map(e => '    uniform highp vec3 ' + e + ';').join('\n')}
             cos(u_camrot.y), 0.0, sin(u_camrot.y),
             0.0, 1.0, 0.0,
             -sin(u_camrot.y), 0.0, cos(u_camrot.y));
-            
-        highp mat3 zrot = mat3(
-            cos(u_camrot.z), -sin(u_camrot.z), 0.0,
-            sin(u_camrot.z), cos(u_camrot.z), 0.0,
-            0.0, 0.0, 1.0);
-            
-        // rayDir = rayDir * xrot * yrot * zrot;
+        rayDir = rayDir * xrot;
+        rayDir = rayDir * yrot;
 
         highp float totalDist = 0.0;
         highp vec3 pos = u_campos;
         highp float dist = EPSILON;
         highp float ever_nearest = 1.0/0.0;
-        highp vec3 ever_nearest_p = vec3(0.0,0.0,0.0);
+        highp vec3 ever_nearest_p = vec3(255.0,0.0,0.0);
         int stepc = 0;
         for (int i = 0; i < MAX_ITER; i++) {
             stepc++;
@@ -157,7 +152,7 @@ ${binds.map(e => '    uniform highp vec3 ' + e + ';').join('\n')}
             pos += dist * rayDir;
         }
         if (dist < EPSILON) {
-            gl_FragColor = vec4(diffuse(pos, rayDir) * vec4(albedo_for(pos), 1.0));
+            gl_FragColor = diffuse(pos, rayDir, dist);
         } else gl_FragColor = vec4(vec3(0.0), 1.0);
     }`;
 }

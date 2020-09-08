@@ -238,7 +238,7 @@ export class Engine {
     }
     reload() {
         let clasa = rfold((a, b) => 'min((' + a + '), (' + b + '))', this.nodes.filter(e => e.has_color).map(e => e.createSDF()));
-        let cf = 'highp float prev_best = 1.0/0.0;highp vec3 cur_color = vec3(0.0, 0.0, 0.0);' + this.nodes.filter(e => e.has_color).map(e => `if ((${e.createSDF()}) < prev_best) { cur_color = ${e.id}color; prev_best = (${e.createSDF()}); }`).join('\n') + '\nreturn cur_color;';
+        let cf = 'highp float prev_best = 1.0/0.0;highp vec3 cur_color = vec3(0.0, 0.0, 255.0);' + this.nodes.filter(e => e.has_color).map(e => `if ((${e.createSDF()}) < prev_best) { cur_color = ${e.id}color; prev_best = (${e.createSDF()}); }`).join('\n') + '\nreturn cur_color;';
         this._reloader(`
                 return ${clasa};
             `, this.deps, cf);
