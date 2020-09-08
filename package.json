@@ -1,0 +1,15 @@
+{
+  "name": "power3d",
+  "version": "1.0.0",
+  "description": "A (sort of) powerful 3d engine, with GPU acceleration",
+  "main": "invalid.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "3d",
+    "gpu"
+  ],
+  "author": "Piotr Stelmaszek",
+  "license": "ISC"
+}

@@ -1,5 +1,8 @@
-let fpsm = new FPSMeter(null, { theme: 'dark', graph: 1, heat: 1 });
-function genBO(df, binds, sf) {
+//let fpsm = new FPSMeter(null, { theme: 'dark', graph: 1, heat: 1 });
+
+import { assert } from "./util";
+
+function generate_fragment_shader(distance_func: string, binds: string[], albedoFunc: string) {
     return `precision highp float;
     const int MAX_ITER = 100;
     const highp float MAX_DIST = 300.0;
@@ -94,11 +97,11 @@ ${binds.map(e => '    uniform highp vec3 ' + e + ';').join('\n')}
     }
 
     highp float distfunc(vec3 pos) {
-        ${df}
+        ${distance_func}
     }
 
     highp vec3 albedo_for(vec3 pos) {
-        ${sf}
+        ${albedoFunc}
     }
     highp vec4 diffuse(highp vec3 pos, highp vec3 rayDir) {
         highp vec2 eps = vec2(0.0, EPSILON);
@@ -158,11 +161,11 @@ ${binds.map(e => '    uniform highp vec3 ' + e + ';').join('\n')}
         } else gl_FragColor = vec4(vec3(0.0), 1.0);
     }`;
 }
-function startGL(binds, df, gbc, sf) {
+export function startGL(binds: string[], distance_func: string, gbc: { [key: string]: [number, number, number] }, albedo_func: string) {
 
-    const canvas = document.querySelector('#glcanvas');
+    const canvas: HTMLCanvasElement = document.querySelector('#glcanvas');
+    assert(canvas.nodeName == 'CANVAS', '#glcanvas was not a canvas');
     const gl = canvas.getContext('webgl');
-    globalThis.glc = gl;
     if (!gl) {
         alert('Unable to initialize WebGL. Your browser or machine may not support it.');
         return;
@@ -174,32 +177,32 @@ function startGL(binds, df, gbc, sf) {
       gl_Position = aVertexPosition;
     }
     `;
-    let fsSource = genBO(df, binds, sf);
+    let fsSource = generate_fragment_shader(distance_func, binds, albedo_func);
     console.log(fsSource);
     let shaderProgram = initShaderProgram(gl, vsSource, fsSource);
     let programInfo = shaderProgram;
     globalThis.prg = programInfo;
     let buffers = initBuffers(gl);
     function f() {
-        fpsm.tickStart();
+        // fpsm.tickStart();
         drawScene(gl, programInfo, buffers, binds, gbc);
         requestAnimationFrame(f);
-        fpsm.tick();
+        // fpsm.tick();
     }
     f();
-    return (ndf, nbinds, nsf) => {
-        df = ndf;
-        sf = nsf;
+    return (ndf: string, nbinds: string[], nsf: string) => {
+        distance_func = ndf;
+        albedo_func = nsf;
         binds = nbinds;
-        fsSource = genBO(df, binds, sf);
+        fsSource = generate_fragment_shader(distance_func, binds, albedo_func);
         console.log(fsSource);
         shaderProgram = initShaderProgram(gl, vsSource, fsSource);
-        glc.deleteProgram(programInfo);
+        gl.deleteProgram(programInfo);
         programInfo = shaderProgram;
         globalThis.prg = programInfo;
     }
 }
-function initBuffers(gl) {
+function initBuffers(gl: WebGLRenderingContext) {
     const positionBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     const positions = [
@@ -212,27 +215,21 @@ function initBuffers(gl) {
     gl.bufferData(gl.ARRAY_BUFFER,
                 new Float32Array(positions),
                 gl.STATIC_DRAW);
-    return {
-        position: positionBuffer,
-    };
+    return positionBuffer;
 }
-function drawScene(gl, program, buffers, binds, gbc) {
+function drawScene(gl: WebGLRenderingContext, program: WebGLProgram, buffers: WebGLBuffer, binds: string[], gbc: { [key: string]: [number, number, number] }) {
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
     gl.clearDepth(1.0);
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    const fieldOfView = 45 * Math.PI / 180;   // in radians
-    const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
-    const zNear = 0.1;
-    const zFar = 100.0;
     {
         const numComponents = 2;
         const type = gl.FLOAT;
         const normalize = false;
         const stride = 0;
         const offset = 0;
-        gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffers);
         gl.vertexAttribPointer(
             gl.getAttribLocation(program, 'aVertexPosition'),
             numComponents,
@@ -244,7 +241,7 @@ function drawScene(gl, program, buffers, binds, gbc) {
     }
     gl.useProgram(program);
     for (let b of binds) {
-        gl.uniform3f(glc.getUniformLocation(prg, b), ...gbc[b]);
+        gl.uniform3f(gl.getUniformLocation(program, b), ...gbc[b]);
     }
     {
         const offset = 0;
@@ -252,7 +249,7 @@ function drawScene(gl, program, buffers, binds, gbc) {
         gl.drawArrays(gl.TRIANGLE_STRIP, offset, vertexCount);
     }
 }
-function initShaderProgram(gl, vsSource, fsSource) {
+function initShaderProgram(gl: WebGLRenderingContext, vsSource: string, fsSource: string) {
     const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vsSource);
     const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource);
     const shaderProgram = gl.createProgram();
@@ -266,7 +263,7 @@ function initShaderProgram(gl, vsSource, fsSource) {
 
     return shaderProgram;
 }
-function loadShader(gl, type, source) {
+function loadShader(gl: WebGLRenderingContext, type: number, source: string) {
     const shader = gl.createShader(type);
     gl.shaderSource(shader, source);
     gl.compileShader(shader);

@@ -1,14 +1,11 @@
-const UNIFORM_TYPES = {
-    INT: 0,
-    FLOAT: 1,
-    VEC2: 2,
-    VEC3: 3,
-    VEC4: 4,
-    [0]: 'INT',
-    [1]: 'FLOAT',
-    [2]: 'VEC2',
-    [3]: 'VEC3',
-    [4]: 'VEC4'
+import { assert } from "./util";
+import { SHADER_STORAGE_BUFFER, COMPUTE_SHADER, getComputeContext } from './constants';
+export enum UNIFORM_TYPES {
+    INT,
+    FLOAT,
+    VEC2,
+    VEC3,
+    VEC4,
 }
 const MAP = {
     INT: '1i',
@@ -36,11 +33,10 @@ const DEFAULT_VAL = {
     '3f': [0, 0, 0],
     '4f': [0, 0, 0, 0]
 }
-function assert(c, v) { if (!c) throw new Error(v); }
-function rflat(a) { return a.flat().map(e => e instanceof Array ? rflat(e) : e); }
-function maptype(t) { return TYPE_MAP[MAP[t]]; }
+function rflat<T>(a: T | (T | (T | T[])[])[]): T[] { return (([a] as any).flat() as (T | (T | T[])[])[]).map(e => e instanceof Array ? rflat(e) : e) as any; }
+function maptype(t: "int" | "float" | "vec2" | "vec3" | "vec4") { return TYPE_MAP[MAP[t]]; }
 
-function encodeIntoBuf(vals) {
+function encodeIntoBuf(vals: [keyof typeof MAP, number[]][]) {
     let len = 0;
     for (let [type] of vals) {
         if (MAP[type] == '1f') len += 4;
@@ -52,7 +48,7 @@ function encodeIntoBuf(vals) {
     let buf = new DataView(new ArrayBuffer(len));
     let off = 0;
     for (let [type, val] of vals) {
-        val = [val].flat();
+        val = ([val] as any).flat();
         if (MAP[type] == '1f') { buf.setFloat32(off, val[0], true); }
         if (MAP[type] == '1i') { buf.setInt32(off, val[0], true); }
         if (MAP[type] == '2f') { buf.setFloat32(off, val[0], true); buf.setFloat32(off + 4, val[1], true); }
@@ -96,41 +92,34 @@ function decodeFromBuf(vals, buf) {
  * 
  * @param {string} code 
  */
-function programFactory(code) {
+function programFactory(code: string) {
     let canvas = new OffscreenCanvas(1, 1)
-    const context = canvas.getContext('webgl2-compute');
+    const context = getComputeContext(canvas);
     const computeShaderSource = code;
-    const computeShader = context.createShader(context.COMPUTE_SHADER);
+    const computeShader = context.createShader(COMPUTE_SHADER as number);
     context.shaderSource(computeShader, computeShaderSource);
     context.compileShader(computeShader);
     const computeProgram = context.createProgram();
     context.attachShader(computeProgram, computeShader);
     context.linkProgram(computeProgram);
-    /**
-     * @template T
-     * @param {{ type: string | number, name: string, data: number[] }[]} uniforms 
-     * @param {T} inbuf 
-     * @param {number} nodeCount 
-     * @returns {T}
-     */
-    function run(uniforms, inbuf, nodeCount) {
+    function run<T extends ArrayBufferView | ArrayBuffer>(uniforms: { type: string | number; name: string; data: number[]; }[], inbuf: T, nodeCount: number): T {
         const buffer = context.createBuffer();
-        context.bindBuffer(context.SHADER_STORAGE_BUFFER, buffer);
-        context.bufferData(context.SHADER_STORAGE_BUFFER, inbuf, context.DYNAMIC_COPY);
-        context.bindBufferBase(context.SHADER_STORAGE_BUFFER, 0, buffer);
+        context.bindBuffer(SHADER_STORAGE_BUFFER, buffer);
+        context.bufferData(SHADER_STORAGE_BUFFER, inbuf, context.DYNAMIC_COPY);
+        context.bindBufferBase(SHADER_STORAGE_BUFFER, 0, buffer);
         context.useProgram(computeProgram);
         if (context.getShaderInfoLog(computeShader)) throw new Error(context.getShaderInfoLog(computeShader));
         if (context.getProgramInfoLog(computeProgram)) throw new Error(context.getProgramInfoLog(computeProgram));
         for (let u of uniforms) {
             let x = context.getUniformLocation(computeProgram, u.name);
-            if (x) context['uniform' + MAP[u.type]](x, ...[u.data].flat());
+            if (x) context['uniform' + MAP[u.type]](x, ...rflat([u.data]));
             else console.warn('Unable to find unform ' + u.name);
         }
         context.dispatchCompute(nodeCount, 1, 1);
         const result = new Uint8Array(inbuf.byteLength);
-        context.getBufferSubData(context.SHADER_STORAGE_BUFFER, 0, result);
-        if (inbuf instanceof ArrayBuffer) return result.buffer;
-        return new inbuf.constructor(result.buffer);
+        context.getBufferSubData(SHADER_STORAGE_BUFFER, 0, result);
+        if (inbuf instanceof ArrayBuffer) return result.buffer as any;
+        return new (inbuf.constructor as any)(result.buffer);
     }
     return run;
 }
@@ -142,8 +131,13 @@ function programFactory(code) {
 //        } ssbo;
 // void main() { int threadIndex = int(gl_GlobalInvocationID.x); ssbo.data[threadIndex] = threadIndex + ssbo.data[threadIndex] + testInt; } `)
 // lel([{ type: UNIFORM_TYPES.INT, data: [2], name: 'testInt' }], new Int32Array([1, 1, 4]), 3);
-
+type IInput = { type: string | number, name: string }[];
 class ComputeShader {
+    _run: <T extends ArrayBufferView | ArrayBuffer>(uniforms: {
+        type: string | number;
+        name: string;
+        data: number[];
+    }[], inbuf: T, nodeCount: number) => T;
     /**
      * 
      * @param {string} code 
@@ -151,10 +145,7 @@ class ComputeShader {
      * @param {{ type: string | number, name: string }[]} inputs 
      * @param {{ type: string | number, name: string }[]} outputs 
      */
-    constructor(code, globalInputs, inputs, outputs) {
-        this.globalInputs = globalInputs;
-        this.inputs = inputs;
-        this.outputs = outputs;
+    constructor(public code: string, public globalInputs: IInput, public inputs: IInput, public outputs: IInput) {
         this._run = programFactory(code);
     }
     /**
@@ -187,7 +178,23 @@ class ComputeShader {
         return decodeFromBuf(bufb, new DataView(this._run(bufa, encodeIntoBuf(bufb), nodeCount)));
     }
 }
+interface FnBuilder {
+    assign(to: LVal, val: Exp): BuiltNode;
+    fmt(pattern: string, ...vals: any[]): Exp;
+}
+type BuiltNode = Exp | LVal | string;
+interface LVal {
+    assignfmt: string;
+}
+interface Exp {
+    exp: string;
+}
 class ComputeShaderBuilder {
+    INT: any;
+    FLOAT: any;
+    VEC2: any;
+    VEC3: any;
+    VEC4: any;
     _main = '__undef__';
     idgenb = 0;
     id() {
@@ -197,26 +204,24 @@ class ComputeShaderBuilder {
         Object.assign(this, UNIFORM_TYPES);
     }
     _code = '';
-    function(rets, args, build) {
-        function str(elem) {
-            return String(elem.exp || elem.assignfmt || elem.id || String(elem));
+    function(rets: string, args: string[], build: (b: FnBuilder) => BuiltNode[]) {
+        function str(elem: Exp | LVal | any) {
+            return String(elem.exp || elem.assignfmt || String(elem));
         }
         let id = this.id();
         let code = rets + ' ' + id + '(' + args.map((e, i) => e + ' arg' + i) + ') {' + rflat(build(Object.assign({
-            assign(to, val) {
-                assert(val.type.includes('exp'));
-                assert(to.type.includes('lval'));
+            assign(to: LVal, val: Exp) {
                 return this.fmt('$1 = $2;', to.assignfmt, val.exp).toString();
             },
-            fmt(pattern, ...vals) {
-                let res = pattern.replace(/\$[0-9]+/g, v => '(' + str(vals[(+v.slice(1)) - 1]) + ')');
-                return { type: ['exp', 'id'], exp: res, toString() { return res; }, id: res };
+            fmt(pattern: string, ...vals: any[]): Exp {
+                let res = pattern.replace(/\$[0-9]+/g, (v: string) => '(' + str(vals[(+v.slice(1)) - 1]) + ')');
+                return {  exp: res, toString() { return res; }, id: res } as any;
             }
-        }, Object.fromEntries(args.map((e, i) => (['arg' + i, { type: ['exp'], exp: 'arg' + i }])))))).join('\n') + '}';
+        }, (Object as any).fromEntries(args.map((e, i) => (['arg' + i, { type: ['exp'], exp: 'arg' + i }])))))).join('\n') + '}';
         this._code += '\n' + code;
         return id;
     }
-    main(id) {
+    main(id: string) {
         this._main = id;
     }
     codegen() {
