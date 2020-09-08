@@ -1,11 +1,5 @@
-function degtotxyz(face) {
-    face = face.map(e => e * Math.PI / 180)
-    return [
-        Math.cos(face[0])+Math.cos(face[1]),
-        Math.sin(face[0]),
-        Math.sin(face[1])
-    ].map(e => Math.floor(e * 1e6) / 1e6)
-}
+import { Engine, Sphere, Plane, BoundingBox, RoundedBox, Combiner, Box } from "./rapi1";
+
 let engine = new Engine();
 let box = new Box();
 let sph = new Sphere();

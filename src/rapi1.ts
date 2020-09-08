@@ -77,7 +77,7 @@ class Camera extends PObject {
         this.engine.data.u_camrot = degtotxyz(this.applicants.rot as [number, number]);
     }
 }
-class Box extends PObject {
+export class Box extends PObject {
     confable = ['pos', 'size', 'color'];
     init() {
         this.id = this.engine.id();
@@ -94,6 +94,8 @@ class Box extends PObject {
 }
 const combineOps = ['and', 'add', 'sub', 'smooth_and', 'smooth_add', 'smooth_sub'];
 export class Combiner {
+    // so TS doesn't complain when nesting combiners
+    applicants: { [key: string]: number[]; } = {};
     has_color = true;
     k: any;
     left: PObject;

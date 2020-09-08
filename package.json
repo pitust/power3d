@@ -11,5 +11,8 @@
     "gpu"
   ],
   "author": "Piotr Stelmaszek",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "snowpack": "^2.10.2"
+  }
 }

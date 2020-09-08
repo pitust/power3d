@@ -121,7 +121,7 @@ ${binds.map(e => '    uniform highp vec3 ' + e + ';').join('\n')}
         highp vec3 cameraDir = normalize(cameraTarget - cameraOrigin);
         highp vec3 cameraRight = normalize(cross(upDirection, cameraOrigin));
         highp vec3 cameraUp = cross(cameraDir, cameraRight);
-        highp vec2 screenPos = -1.0 + 2.0 * gl_FragCoord.xy / vec2(480.0);
+        highp vec2 screenPos = -1.0 + 2.0 * gl_FragCoord.xy / vec2(1000.0);
         highp vec3 rayDir = normalize(cameraRight * screenPos.x + cameraUp * screenPos.y + cameraDir);
         
         highp mat3 xrot = mat3(
