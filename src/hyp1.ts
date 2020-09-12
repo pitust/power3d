@@ -1,4 +1,4 @@
-import { Engine, Sphere, Plane, BoundingBox, RoundedBox, Combiner, Box } from "./rapi1";
+import { Engine, Sphere, Plane, BoundingBox, RoundedBox, Combiner, Box } from "./low-level";
 
 let engine = new Engine();
 let box = new Box();
@@ -51,21 +51,39 @@ let ry = 0;
 engine.cam.conf('rot', 0, 0);
 engine.go();
 document.onclick = () => { document.body.requestPointerLock(); }
+let e = document.createElement('div');
+document.body.appendChild(e);
+e.innerHTML  = '[]';
 document.body.onmousemove = ({movementX, movementY}) => {
-    rp += movementY;
-    ry -= movementX;
+    rp += movementY / 3;
+    ry -= movementX / 3;
+    rp += 360;
+    ry += 360;
+    rp = rp % 360;
+    ry = ry % 360;
+    if (rp > 90 && rp < 180) rp = 90;
+    if (rp > 180 && rp < 270) rp = 270;
     engine.cam.conf('rot', rp, ry);
+    e.innerHTML = `[${rp},${ry}]`
 };
 function move(m: number, off: number) {
     let np = engine.cam.applicants.pos;
-    np[2] -= Math.cos(ry / 180 * Math.PI + off) * m;
-    np[0] -= Math.sin(ry / 180 * Math.PI + off) * m;
+    np[2] -= Math.cos(ry / 180 * Math.PI + off) * m / 2;
+    np[0] -= Math.sin(ry / 180 * Math.PI + off) * m / 2;
 }
+let keyset = new Set<string>();;
+window.onkeyup = (({ code }) => {
+    keyset.delete(code);
+});
 window.onkeydown = (({ code }) => {
-    if (code == 'KeyA') move(1,  Math.PI / 2);
-    if (code == 'KeyD') move(1, -Math.PI / 2);
-    if (code == 'KeyW') move(1, 0);
-    if (code == 'KeyS') move(-1, 0);    
-    console.log(code);
-    if (code == 'Space') engine.cam.vel = -0.25;
+    keyset.add(code);
 })
+function f() {
+    if (keyset.has('KeyA')) move(1,  Math.PI / 2);
+    if (keyset.has('KeyD')) move(1, -Math.PI / 2);
+    if (keyset.has('KeyW')) move(1, 0);
+    if (keyset.has('KeyS')) move(-1, 0);    
+    if (keyset.has('Space')) engine.cam.vel = -0.35;
+    requestAnimationFrame(f);
+}
+f();

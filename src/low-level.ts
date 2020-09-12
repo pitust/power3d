@@ -51,29 +51,17 @@ class Camera extends PObject {
     vel = 0;
     constructor() {
         super();
-        window.onkeydown = (({ code }) => {
-            if (code == 'KeyA') this.applicants.pos[0] -= 0.5;
-            if (code == 'KeyD') this.applicants.pos[0] += 0.5;
-            if (code == 'KeyW') this.applicants.pos[2] -= 0.5;
-            if (code == 'KeyS') this.applicants.pos[2] += 0.5;
-            if (code == 'ArrowUp') this.applicants.rot[0] += 5.0;
-            if (code == 'ArrowDown') this.applicants.rot[0] -= 5.0;
-            if (code == 'ArrowLeft') this.applicants.rot[1] -= 5.0;
-            if (code == 'ArrowRight') this.applicants.rot[1] += 5.0;
-            console.log(code);
-            if (code == 'Space') this.vel = -0.25;
-        }).bind(this);
     }
     frame() {
         this.engine.depends('u_campos');
         this.engine.depends('u_camrot');
         this.applicants.pos[1] += this.vel;
-        this.vel += 0.01;
+        this.vel += 0.04;
         if (this.applicants.pos[1] > -1) { this.applicants.pos[1] = -1; }
         this.apply();
     }
     apply() {
-        this.engine.data.u_campos = this.applicants.pos  as [number, number, number];
+        this.engine.data.u_campos = this.applicants.pos as [number, number, number];
         this.engine.data.u_camrot = degtotxyz(this.applicants.rot as [number, number]);
     }
 }
@@ -86,9 +74,9 @@ export class Box extends PObject {
         this.engine.depends(this.id + 'color');
     }
     apply() {
-        this.engine.data[this.id + 'pos'] = this.applicants.pos  as [number, number, number];
-        this.engine.data[this.id + 'size'] = this.applicants.size  as [number, number, number];
-        this.engine.data[this.id + 'color'] = this.applicants.color  as [number, number, number];
+        this.engine.data[this.id + 'pos'] = this.applicants.pos as [number, number, number];
+        this.engine.data[this.id + 'size'] = this.applicants.size as [number, number, number];
+        this.engine.data[this.id + 'color'] = this.applicants.color as [number, number, number];
     }
     createSDF() { return `box(pos - ${this.id}pos, ${this.id}size)`; }
 }
@@ -228,8 +216,10 @@ export class Engine {
     }
     id() { console.trace('u_' + (++this.idgen) + '_'); return 'u_' + (this.idgen) + '_'; }
     depends(wut) { if (!this.deps.includes(wut)) this.deps.push(wut); }
-    go() {
-        this.frame();
+    go(run: boolean = true) {
+        if (run) {
+            this.frame();
+        }
         let clasa = rfold((a, b) => 'min((' + a + '), (' + b + '))', this.nodes.map(e => e.createSDF()));
         let cf = 'highp float prev_best = 1.0/0.0;highp vec3 cur_color = vec3(0.0, 0.0, 0.0);' + this.nodes.filter(e => e.has_color).map(e => `if ((${e.createSDF()}) < prev_best) { cur_color = ${e.id}color; prev_best = (${e.createSDF()}); }`).join('\n') + '\nreturn cur_color;';
         this._reloader = startGL(this.deps, `
@@ -243,12 +233,14 @@ export class Engine {
                 return ${clasa};
             `, this.deps, cf);
     }
-    frame() {
+    frame(shouldQueue: boolean = true) {
         for (let n of this.nodes) {
             n.engine = this;
             n.frame();
             n.engine = null;
         }
-        requestAnimationFrame(this.frame.bind(this));
+        if (shouldQueue) {
+            requestAnimationFrame(this.frame.bind(this) as any);
+        }
     }
 }
