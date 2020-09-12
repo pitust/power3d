@@ -48,16 +48,12 @@ export class AxisWarper {
 class Camera extends PObject {
     confable = ['pos', 'rot'];
     has_color = false
-    vel = 0;
     constructor() {
         super();
     }
     frame() {
         this.engine.depends('u_campos');
         this.engine.depends('u_camrot');
-        this.applicants.pos[1] += this.vel;
-        this.vel += 0.04;
-        if (this.applicants.pos[1] > -1) { this.applicants.pos[1] = -1; }
         this.apply();
     }
     apply() {
@@ -178,6 +174,19 @@ export class Sphere extends PObject {
     }
     createSDF() { return `sphere(pos - ${this.id}pos, ${this.id}radius_vec.x)`; }
 }
+export class MetaSphere extends PObject {
+    confable = ['pos', 'color'];
+    init() {
+        this.id = this.engine.id();
+        this.engine.depends(this.id + 'pos');
+        this.engine.depends(this.id + 'color');
+    }
+    apply() {
+        this.engine.data[this.id + 'pos'] = this.applicants.pos as [number, number, number];
+        this.engine.data[this.id + 'color'] = this.applicants.color as [number, number, number];
+    }
+    createSDF() { return `sphere(pos - ${this.id}pos, 0.3)`; }
+}
 export class Plane extends PObject {
     confable = ['pos', 'color'];
     init() {
@@ -206,13 +215,16 @@ export class Engine {
     idgen = 0;
     deps = ['u_campos'];
     data: { [key: string]: [number, number, number] } = { u_campos: [0, 0, 0] };
-    add(...nodes) {
+    add(...nodes: PObject[]) {
         this.nodes.push(...nodes);
         for (let n of nodes) {
             n.engine = this;
             n.init();
             n.engine = null;
         }
+    }
+    del(n: PObject) {
+        this.nodes = this.nodes.filter(e => e != n);
     }
     id() { console.trace('u_' + (++this.idgen) + '_'); return 'u_' + (this.idgen) + '_'; }
     depends(wut) { if (!this.deps.includes(wut)) this.deps.push(wut); }

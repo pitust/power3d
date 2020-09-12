@@ -110,8 +110,8 @@ ${binds.map(e => '    uniform highp vec3 ' + e + ';').join('\n')}
             distfunc(pos + eps.xyx) - distfunc(pos - eps.xyx),
             distfunc(pos + eps.xxy) - distfunc(pos - eps.xxy)));
         highp float diffuse = max(0.0, dot(-rayDir, normal));
-        highp float specular = 0.0; //  pow(diffuse, 100.0);
-        highp vec3 color = vec3(diffuse) * albedo_for(pos);
+        highp float specular = 0.0 * pow(diffuse, 100.0);
+        highp vec3 color = albedo_for(pos) * vec3(diffuse);
         return vec4(color, 1.0);
     }
     void main() {
@@ -121,7 +121,7 @@ ${binds.map(e => '    uniform highp vec3 ' + e + ';').join('\n')}
         highp vec3 cameraDir = normalize(cameraTarget - cameraOrigin);
         highp vec3 cameraRight = normalize(cross(upDirection, cameraOrigin));
         highp vec3 cameraUp = cross(cameraDir, cameraRight);
-        highp vec2 screenPos = -1.0 + 2.0 * gl_FragCoord.xy / vec2(1000.0);
+        highp vec2 screenPos = -1.0 + 2.0 * gl_FragCoord.xy / vec2(800.0);
         highp vec3 rayDir = normalize(cameraRight * screenPos.x + cameraUp * screenPos.y + cameraDir);
         
         highp mat3 xrot = mat3(
